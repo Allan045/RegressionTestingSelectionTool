@@ -14,4 +14,24 @@ public class InboundField {
     public String confirmed;
 
     public String text;
+    
+    
+    public Boolean isConfirmed() {
+		if(this.confirmed.equals("yes")) {
+			return Boolean.TRUE;
+		}else {
+			return Boolean.FALSE;
+		}
+    }
+    
+    private void cleanInnerClass() {
+    	if(this.text.contains("$")) {
+    		this.text = this.text.split("\\$")[0];
+    	}
+    }
+    
+
+    public void cleanInbound() {
+    	this.cleanInnerClass();
+    }
 }

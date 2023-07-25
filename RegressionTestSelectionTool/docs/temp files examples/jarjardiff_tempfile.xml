@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!DOCTYPE differences SYSTEM "http://depfind.sourceforge.net/dtd/differences.dtd">
+
+<differences>
+    <name></name>
+    <old>Initial</old>
+    <new>Modified</new>
+    <modified-classes>
+        <class>
+            <name>com.fasterxml.jackson.dataformat.xml.PackageVersion</name>
+            <modified-methods>
+                <feature>
+                    <name>com.fasterxml.jackson.dataformat.xml.PackageVersion.static {}</name>
+                    <modified-code visibility="package" static="yes" signature="static {}" full-signature="com.fasterxml.jackson.dataformat.xml.PackageVersion.static {}" throws="">static {}</modified-code>
+                </feature>
+            </modified-methods>
+        </class>
+        <class>
+            <name>com.fasterxml.jackson.dataformat.xml.ser.XmlSerializerProvider</name>
+            <modified-constructors>
+                <feature>
+                    <name>com.fasterxml.jackson.dataformat.xml.ser.XmlSerializerProvider.XmlSerializerProvider(com.fasterxml.jackson.dataformat.xml.ser.XmlSerializerProvider)</name>
+                    <modified-code visibility="protected" signature="XmlSerializerProvider(com.fasterxml.jackson.dataformat.xml.ser.XmlSerializerProvider)" full-signature="com.fasterxml.jackson.dataformat.xml.ser.XmlSerializerProvider.XmlSerializerProvider(com.fasterxml.jackson.dataformat.xml.ser.XmlSerializerProvider)" throws="">protected XmlSerializerProvider(com.fasterxml.jackson.dataformat.xml.ser.XmlSerializerProvider)</modified-code>
+                </feature>
+            </modified-constructors>
+        </class>
+    </modified-classes>
+</differences>

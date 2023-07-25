@@ -12,4 +12,17 @@ public class DifferencesField {
 
     @XStreamAlias("new-packages")
     public NewPackagesField newPackagesField;
+    
+    public void cleanDiferrencesField() {
+    	
+    	if(this.newClassesField != null)
+    		this.newClassesField.clean();
+    	
+    	if(this.modifiedClassesField != null)
+    		this.modifiedClassesField.clean();
+    	
+    	if(this.newPackagesField != null)
+    		this.newPackagesField.names.clear();
+    	
+    }
 }

@@ -23,8 +23,8 @@ public class Rule {
     this.ref = "category/java/" + getRuleCategory(rule) +".xml/" + rule;
 
     if(rule == "CommentSize") {
-      properties.list.add(new Property("maxLines", "1"));
-      properties.list.add(new Property("maxLineLength", "1"));
+      properties.list.add(new Property("maxLines", "6"));
+      properties.list.add(new Property("maxLineLength", "80"));
     }
   }
 

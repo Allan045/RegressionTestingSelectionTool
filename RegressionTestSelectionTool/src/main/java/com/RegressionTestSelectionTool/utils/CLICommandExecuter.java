@@ -5,11 +5,11 @@ import java.io.InputStream;
 import java.util.Scanner;
 
 public class CLICommandExecuter {
-    public CLICommandExecuter() {}
 
-    public void execute(String cmd) {
-        System.out.println();
+    public static void Execute(String cmd) {
+        //System.out.println("");
         System.out.println("Running CLI Command: " + cmd);
+        System.out.println("");
         String errorResult = null;
         try (
                 InputStream inputStream = Runtime.getRuntime().exec(cmd).getErrorStream();

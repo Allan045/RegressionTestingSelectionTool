@@ -1,36 +1,50 @@
-package com.RegressionTestSelectionTool;
+//v14
 
-import com.RegressionTestSelectionTool.CodeSmellsDetector.CodeSmellsDetector;
-import com.RegressionTestSelectionTool.utils.OSGetter;
-import com.RegressionTestSelectionTool.utils.SelectionTechniqueEnum;
-import com.RegressionTestSelectionTool.xmlfields.dependencies.*;
-import com.RegressionTestSelectionTool.xmlfields.differences.DifferencesField;
-import com.RegressionTestSelectionTool.xmlfields.differences.ModifiedClassField;
-import com.RegressionTestSelectionTool.xmlfields.differences.ModifiedClassesField;
-import com.RegressionTestSelectionTool.xmlfields.differences.NewClassesField;
-import com.google.common.collect.Lists;
-import com.strobel.decompiler.Decompiler;
-import com.strobel.decompiler.DecompilerSettings;
-import com.strobel.decompiler.PlainTextOutput;
-import com.thoughtworks.xstream.XStream;
-import jdk.jshell.spi.ExecutionControl.NotImplementedException;
-import static java.util.stream.Collectors.toList;
+//v13 - Alternative 
+
+package com.RegressionTestSelectionTool;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Scanner;
+import java.util.Set;
+
+import com.RegressionTestSelectionTool.CodeSmellsDetector.CodeSmellsDetector;
+import com.RegressionTestSelectionTool.DependencyFinderTool.DependencyFinder;
+import com.RegressionTestSelectionTool.DependencyFinderTool.JarJarDiff;
+import com.RegressionTestSelectionTool.Technique.SelectionTechnique;
+import com.RegressionTestSelectionTool.Technique.SelectionTechniqueEnum;
+import com.RegressionTestSelectionTool.Technique.SelectionTechniqueFactory;
+import com.RegressionTestSelectionTool.utils.CheckRequirements;
+import com.RegressionTestSelectionTool.xmlfields.dependencies.ClassField;
+import com.RegressionTestSelectionTool.xmlfields.dependencies.DependenciesField;
+import com.RegressionTestSelectionTool.xmlfields.dependencies.InboundField;
+import com.RegressionTestSelectionTool.xmlfields.dependencies.OutboundField;
+import com.RegressionTestSelectionTool.xmlfields.dependencies.PackageField;
+import com.RegressionTestSelectionTool.xmlfields.differences.DifferencesField;
+import com.RegressionTestSelectionTool.xmlfields.differences.ModifiedClassField;
+import com.RegressionTestSelectionTool.xmlfields.differences.ModifiedClassesField;
+import com.RegressionTestSelectionTool.xmlfields.differences.NewClassesField;
+import com.RegressionTestSelectionTool.xmlfields.differences.NewPackagesField;
+
+import jdk.jshell.spi.ExecutionControl.NotImplementedException;
 
 public class TestSelector {
-    private String dependencyFinderHomePath = null;
+	
+	//Main Paths
+    private final String dependencyFinderHomePath;
     private final String initialProjectVersionDirectoryPath;
     private final String modifiedProjectVersionDirectoryPath;
+    
+    //Processing XML
+    private  ArrayList<String> tempXMLOutputPaths = new ArrayList<>();
     private final List<String> tempXMLOutputFilenames = Arrays.asList(
             "dependency_extractor_for_modified_version_tempfile.xml",
             "c2c_for_modified_version_tempfile.xml",
@@ -38,430 +52,190 @@ public class TestSelector {
             "dependency_extractor_for_initial_version_tempfile.xml",
             "c2c_for_initial_version_tempfile.xml"
     );
-    private  ArrayList<String> tempXMLOutputPaths = new ArrayList<>();
-    private final SelectionTechniqueEnum selectionTechnique;
-    private final Set<String> modifiedAndNewClassInbounds = new HashSet<>();
-    private  DependenciesField modifiedVersionClassDependencies;
-    private  DifferencesField classDifferences;
-    private DependenciesField initialVersionTestsClassDependencies;
-    private final Set<String> selectedTestClasses = new HashSet<>();
-    private final Set<String> newClassesFromNewPackages = new HashSet<>();
+    
+    //Logic XML
+    private DependenciesField newestVersionClassDependencies;
+    private DependenciesField oldestVersionClassDependencies;
+    private DependenciesField oldestVersionTestsClassDependencies;
+    private DifferencesField classDifferences;
+    
+    private Set<String> originalTestSet = new HashSet<>();
+    //private final SelectionTechniqueEnum selectionTechnique;
+    private final ArrayList<SelectionTechniqueEnum> selectedTechniquesNames;
+    
+    
+    //Technique Logic    
+    private Set<ClassField> selectedClassesDependencies = new HashSet<>();
+    private Set<String> notSelectedTestClasses = new HashSet<>();
+    private Set<String> selectedTestClasses = new HashSet<>();
+    private Set<String> selectedClasses = new HashSet<>();
+
+    
+    //Code Smell Logic
+    private CodeSmellsDetector smellsDetector;
+	private Set<String> selectedViolations;
     private Set<String> classesWithViolations = new HashSet<>();
 
-    private CodeSmellsDetector smellsDetector;
+	private ArrayList<Report> reports;
+	
 
-    public  void main(String[] args) {}
+	public ArrayList<Report> getReports() {
+		return reports;
+	}
 
-    public TestSelector(
-            String initialProjectVersionDirectoryPath,
-            String modifiedProjectVersionDirectoryPath,
-            SelectionTechniqueEnum selectionTechnique
-    ) throws NotImplementedException {
-        this.initialProjectVersionDirectoryPath = initialProjectVersionDirectoryPath;
-        this.modifiedProjectVersionDirectoryPath = modifiedProjectVersionDirectoryPath;
-        this.selectionTechnique = selectionTechnique;
+
+	public void main(String[] args) {    	
+
+    		if(CheckRequirements.checkRequirements(dependencyFinderHomePath)) {
+	    		
+    			createTemporaryFilesPath();
+    			
+	        	setClassesDependenciesAndSmells();
+	        	
+	        	setClassDifferences();
+
+	        	reports = setTechniques();       
+ 
+		        deleteTempFiles();
+    			
+			}				        
+			
     }
 
-    public TestSelector(
-            String initialProjectVersionDirectoryPath,
-            String modifiedProjectVersionDirectoryPath,
-            SelectionTechniqueEnum selectionTechnique,
-            String dependencyFinderHomePath
-    ) throws NotImplementedException {
-        this(initialProjectVersionDirectoryPath, modifiedProjectVersionDirectoryPath, selectionTechnique);
-        this.dependencyFinderHomePath = dependencyFinderHomePath;
-        this.initializeSmellsDetector(initialProjectVersionDirectoryPath, modifiedProjectVersionDirectoryPath, new ArrayList<>());
-    }
 
-    public TestSelector(
+    private ArrayList<Report> setTechniques() {
+    	ArrayList<Report> techniqueReports = new ArrayList<>();
+    	SelectionTechniqueFactory selectionTechniqueFactory = new SelectionTechniqueFactory();
+    	
+    	for(SelectionTechniqueEnum techniqueName : selectedTechniquesNames) {
+        	SelectionTechnique choosedSelectionTechnique = selectionTechniqueFactory.createSelectionTechnique(
+        			techniqueName,
+        			oldestVersionClassDependencies,
+        			oldestVersionTestsClassDependencies,
+        			newestVersionClassDependencies,
+        			classDifferences,
+        			selectedViolations,
+        			classesWithViolations);
+        	
+        	techniqueReports.add(choosedSelectionTechnique.getTechniqueReport());
+    	}
+    	
+    	return techniqueReports;
+	}
+
+
+	private void setClassDifferences() {
+    	if(classDifferences == null) {
+    		JarJarDiff differences = new JarJarDiff(dependencyFinderHomePath, initialProjectVersionDirectoryPath, modifiedProjectVersionDirectoryPath, tempXMLOutputPaths.get(2));
+        	classDifferences = differences.getClassDifferences();
+    	} 	
+	}
+
+
+	private void setClassesDependenciesAndSmells() {
+    	DependencyFinder oldestVersion = new DependencyFinder(dependencyFinderHomePath, initialProjectVersionDirectoryPath, tempXMLOutputPaths.get(3), tempXMLOutputPaths.get(4),Boolean.TRUE);
+    	DependencyFinder newestVersion = new DependencyFinder(dependencyFinderHomePath, modifiedProjectVersionDirectoryPath, tempXMLOutputPaths.get(0), tempXMLOutputPaths.get(1),Boolean.FALSE);
+    	
+    	
+    	Thread oldestVersionThread = new Thread(oldestVersion);
+    	Thread newestVersionThread = new Thread(newestVersion);
+    	Thread smellDetectorThread = new Thread(smellsDetector);
+    	
+    	oldestVersionThread.start();
+    	newestVersionThread.start();
+    	smellDetectorThread.start();
+    	
+    	
+    	try {
+			oldestVersionThread.join();
+			newestVersionThread.join();
+			smellDetectorThread.join();
+			
+			oldestVersionClassDependencies = oldestVersion.getClassDependencies();
+	    	oldestVersionTestsClassDependencies = oldestVersion.getTestClassDependencies();
+	    	originalTestSet = oldestVersion.getOriginalTestSet();
+	    	newestVersionClassDependencies = newestVersion.getClassDependencies();	
+	    	classesWithViolations = smellsDetector.getClassWithViolationsList(); 
+	    	
+		} catch (InterruptedException e) {
+			System.out.println("Error Dependency Finder or PMD");
+			e.printStackTrace();
+			
+		}
+	
+	}
+
+	
+    public Set<String> getNotSelectedTestSet() {
+    	return notSelectedTestClasses;
+	}
+
+
+    public TestSelector(  		
             String initialProjectVersionDirectoryPath,
             String modifiedProjectVersionDirectoryPath,
-            SelectionTechniqueEnum selectionTechnique,
+            ArrayList<SelectionTechniqueEnum> selectedTechniquesNames,
             String dependencyFinderHomePath,
-            ArrayList<String> selectedViolations
+            ArrayList<String> selectedViolations,
+            Boolean codeSmellIntersection
+            
     ) throws NotImplementedException {
-        this(initialProjectVersionDirectoryPath, modifiedProjectVersionDirectoryPath, selectionTechnique);
+    	this.initialProjectVersionDirectoryPath = initialProjectVersionDirectoryPath;
+    	this.modifiedProjectVersionDirectoryPath = modifiedProjectVersionDirectoryPath; 
+    	this.selectedTechniquesNames = selectedTechniquesNames;
         this.dependencyFinderHomePath = dependencyFinderHomePath;
-        this.initializeSmellsDetector(initialProjectVersionDirectoryPath, modifiedProjectVersionDirectoryPath, selectedViolations);
-    }
-
-    public void initializeSmellsDetector(
-            String initialProjectVersionDirectoryPath,
-            String modifiedProjectVersionDirectoryPath,
-            ArrayList<String> selectedViolations) throws NotImplementedException {
-        this.smellsDetector = new CodeSmellsDetector(modifiedProjectVersionDirectoryPath, selectedViolations);
-    }
-
-    public List<String> getSelectedClasses() throws NotImplementedException {
-        checkDependencyFinderHomePathRequirement();
-        setTempXMLOutputPaths(); // pode ir pro construtor
-
-        classesWithViolations = this.smellsDetector.getClassWithCodeViolationsList();
-
-        // classesWithViolations = new HashSet<String>();
-        // First Step
-        setClassesDependenciesForModifiedVersion();
-        setClassesDependenciesForTestsFromInitialVersion();
-
-        // Second Step
-        setClassesDifferencesBetweenInitialAndModifiedVersion();
-
-        // Third Step
-        if (selectionTechnique.equals(SelectionTechniqueEnum.CLASS_FIREWALL)) {
-            setClassesInboundsFromTechniqueSeeds(false);
-        }
-        else if (selectionTechnique.equals(SelectionTechniqueEnum.CHANGE_BASED)){
-            setClassesInboundsFromTechniqueSeeds(true);
-        } else if (selectionTechnique.equals(SelectionTechniqueEnum.CLASS_FIREWALL_ONLY_SMELLS)){
-            setClassesInboundsFromTechniqueSeeds(true);
-        } else if (selectionTechnique.equals(SelectionTechniqueEnum.CLASS_FIREWALL_WITH_SMELLS)){
-            setClassesInboundsFromTechniqueSeeds(true);
-        }
-
-        // Fourth Step
-        getSelectedTestCasesUsingClassesInbounds();
-        
-        deleteTempFiles();
-
-        return selectedTestClasses.stream().toList();
-    }
-
-    public Set<String> possibleSelectedTestClasses() {
-        final Set<String> numberOfClassesInModifiedVersion = new HashSet<String>();
-
-        if (initialVersionTestsClassDependencies.packages != null) {
-            initialVersionTestsClassDependencies.packages.forEach(testPackageField ->
-            testPackageField.classes.forEach(classField -> {
-                    var name = classField.name.split("\\$")[0];
-                    numberOfClassesInModifiedVersion.add(name);
-            }));
-        }
-
-        return numberOfClassesInModifiedVersion;
-    }
-
-    private void getSelectedTestCasesUsingClassesInbounds() {
-        modifiedAndNewClassInbounds.forEach(modifiedAndNewClassInbound ->
-                initialVersionTestsClassDependencies.packages.forEach(testPackageField ->
-                        testPackageField.classes.forEach(testClassField -> {
-                            if (testClassField.name.equals(modifiedAndNewClassInbound))
-                                selectedTestClasses.add(modifiedAndNewClassInbound);
-                        })));
-    }
-
-    private void setClassesInboundsFromTechniqueSeeds(boolean stopAtFirstLevel) {
-        if (selectionTechnique.equals(SelectionTechniqueEnum.CLASS_FIREWALL) || (selectionTechnique.equals(SelectionTechniqueEnum.CHANGE_BASED))) {
-            getModifiedClassesInbounds(stopAtFirstLevel);
-            getNewClassesInbounds(stopAtFirstLevel);
-        } else if (selectionTechnique.equals(SelectionTechniqueEnum.CLASS_FIREWALL_ONLY_SMELLS)){
-            getClassesWithViolationsInbounds(stopAtFirstLevel);
-        } else if (selectionTechnique.equals(SelectionTechniqueEnum.CLASS_FIREWALL_WITH_SMELLS)){
-            getClassesWithViolationsInbounds(stopAtFirstLevel);
-            getModifiedClassesInbounds(stopAtFirstLevel);
-            getNewClassesInbounds(stopAtFirstLevel);
-        }
-    }
-
-    private void getModifiedClassesInbounds(boolean stopAtFirstLevel) {
-        if (classDifferences.modifiedClassesField != null && classDifferences.modifiedClassesField.classes != null) {
-            classDifferences.modifiedClassesField.classes
-                    .stream()
-                    .map(modifiedClass -> modifiedClass.name)
-                    .forEach(modifiedClassName -> {
-                        modifiedAndNewClassInbounds.add(modifiedClassName);
-                        getClassInboundsForClass(modifiedClassName, stopAtFirstLevel);
-                    });
-        }
-    }
-
-    private void getNewClassesInbounds(boolean stopAtFirstLevel) {
-        if (classDifferences.newClassesField != null && classDifferences.newClassesField.names != null) {
-            classDifferences.newClassesField.names.forEach(newClassName -> {
-                modifiedAndNewClassInbounds.add(newClassName);
-                getClassInboundsForClass(newClassName, stopAtFirstLevel);
-            });
-        }
-        if (!newClassesFromNewPackages.isEmpty()) {
-            newClassesFromNewPackages.forEach(newClassName -> {
-                modifiedAndNewClassInbounds.add(newClassName);
-                getClassInboundsForClass(newClassName, stopAtFirstLevel);
-            });
-        }
-    }
-
-    private void getClassesWithViolationsInbounds(boolean stopAtFirstLevel) {
-        if (classesWithViolations != null && !classesWithViolations.isEmpty()) {
-            classesWithViolations.forEach(classWithViolation -> {
-                modifiedAndNewClassInbounds.add(classWithViolation);
-                getClassInboundsForClass(classWithViolation, stopAtFirstLevel);
-            });
-        }
-    }
-
-    private void setClassesDifferencesBetweenInitialAndModifiedVersion() throws NotImplementedException {
-        runJarJarDiff();
-        getDifferencesFromXML(tempXMLOutputPaths.get(2));
-
-        removeTestsClassDifferences();
-        analyzeClassFilesToGetNewClassesFromNewPackages();
-    }
-
-    private void analyzeClassFilesToGetNewClassesFromNewPackages() {
-        if (classDifferences.newPackagesField != null && classDifferences.newPackagesField.names != null) {
-            var newPackagesNames = new ArrayList<String>(classDifferences.newPackagesField.names);
-
-            try {
-                ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
-
-                var paths = Files.walk(Paths.get(modifiedProjectVersionDirectoryPath))
-                        .filter(path -> path.toString().endsWith(".class"))
-                        .toList();
-
-                var numberOfPaths = paths.size();
-                var numberOfThreads = 8;
-
-                var chunkSize = numberOfPaths / (numberOfThreads - 1);
-
-                var subSetsPaths = Lists.partition(paths, chunkSize);
-                System.out.println("Number of Subsets of chunkSize " + chunkSize + ": " + subSetsPaths.size());
-                subSetsPaths
-                        .forEach(listOfPaths -> {
-                            executor.submit(() -> {
-                                listOfPaths.forEach(path -> {
-                                    System.out.println("Decompiling: " + path);
-                                    final DecompilerSettings settings = DecompilerSettings.javaDefaults();
-                                    var plainTextOutput = new PlainTextOutput();
-                                    Decompiler.decompile(
-                                            path.toString(),
-                                            plainTextOutput,
-                                            settings
-                                    );
-
-                                    var output = plainTextOutput.toString();
-                                    String newClassName = path.getFileName().toString().replace(".class", "");
-                                    if (newClassName.contains("Test")) {
-                                        return; // should not get classDifferences for test classes, so here we skip them
-                                    }
-
-                                    for (String newPackageName : newPackagesNames) {
-                                        var packageName = "package " + newPackageName;
-
-                                        if (output.contains(packageName)) {
-                                            String newClassFullName = packageName.replace("package ", "") + "." + newClassName;
-                                            newClassesFromNewPackages.add(newClassFullName);
-                                            break;
-                                        }
-                                    }
-                                });
-                                executor.shutdown();
-                                return null;
-                            });
-                        });
-                executor.awaitTermination(20, TimeUnit.MINUTES);
-            } catch (IOException | InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private void removeTestsClassDifferences() {
-        if (this.classDifferences != null) {
-            if (this.classDifferences.newClassesField != null) {
-                if (classDifferences.newClassesField.names != null) {
-                    classDifferences.newClassesField.names.removeIf(name -> name.contains("Test"));
-                }
-            }
-            if (this.classDifferences.modifiedClassesField != null) {
-                if (classDifferences.modifiedClassesField.classes != null) {
-                    classDifferences.modifiedClassesField.classes.removeIf(classField -> classField.name.contains("Test"));
-                }
-            }
-
-        }
-    }
-
-    private void removeNotConfirmedClassDependenciesForModifiedVersion() {
-        if (modifiedVersionClassDependencies.packages != null) {
-            modifiedVersionClassDependencies.packages.removeIf(packageField -> packageField.confirmed.equals("no"));
-            modifiedVersionClassDependencies.packages.forEach(packageField -> {
-                packageField.classes.removeIf(classField -> classField.confirmed.equals("no"));
-                packageField.classes.forEach(classField -> {
-                    if (classField.inbounds != null) classField.inbounds.removeIf(inboundField -> inboundField.confirmed.equals("no"));
-                    if (classField.outbounds != null) classField.outbounds.removeIf(outboundField -> outboundField.confirmed.equals("no"));
-                });
-            });
-        }
-    }
-
-    private void removeNotConfirmedClassDependenciesForTestsFromInitialVersion() {
-        if (initialVersionTestsClassDependencies.packages != null) {
-            initialVersionTestsClassDependencies.packages.removeIf(packageField -> packageField.confirmed.equals("no"));
-            initialVersionTestsClassDependencies.packages.forEach(packageField -> {
-                packageField.classes.removeIf(classField -> classField.confirmed.equals("no"));
-                packageField.classes.forEach(classField -> {
-                    if (classField.inbounds != null) classField.inbounds.removeIf(inboundField -> inboundField.confirmed.equals("no"));
-                    if (classField.outbounds != null) classField.outbounds.removeIf(outboundField -> outboundField.confirmed.equals("no"));
-                });
-            });
-        }
-    }
-
-    private void runJarJarDiff() throws NotImplementedException {
-        String JarJarDiffCommand;
-        JarJarDiffCommand = getJarJarDiffCommand();
-        execCmd(JarJarDiffCommand);
-        System.out.println();
-    }
-
-    private String getJarJarDiffCommand() throws NotImplementedException {
-        String CLICommand;
-        if (OSGetter.isWindows()) {
-            CLICommand = "cmd.exe /c JarJarDiff -code -out " + tempXMLOutputPaths.get(2)
-                    + " -old-label Initial -old " + initialProjectVersionDirectoryPath
-                    + " -new-label Modified -new " + modifiedProjectVersionDirectoryPath;
-        } else if (OSGetter.isUnix() || OSGetter.isMac()) {
-            CLICommand = dependencyFinderHomePath + "/bin/JarJarDiff -code -out " + tempXMLOutputPaths.get(2)
-                    + " -old-label Initial -old " + initialProjectVersionDirectoryPath
-                    + " -new-label Modified -new " + modifiedProjectVersionDirectoryPath;
-        }
-        else {
-            throw new NotImplementedException("Your Operational System is not supported yet");
-        }
-        return CLICommand;
-    }
-
-    private void getDifferencesFromXML(String tempXMLOutputPath) {
-        var xStream = new XStream();
-        xStream.ignoreUnknownElements();
-        xStream.allowTypesByWildcard(new String[] {
-                "com.RegressionTestSelectionTool.**",
-        });
-        xStream.processAnnotations(DifferencesField.class);
-        xStream.processAnnotations(ModifiedClassesField.class);
-        xStream.processAnnotations(ModifiedClassField.class);
-        xStream.processAnnotations(NewClassesField.class);
-
-        var XMLFile = new File(tempXMLOutputPath);
-
-        classDifferences = (DifferencesField) xStream.fromXML(XMLFile);
-    }
-
-    private void getClassInboundsForClass(String className, boolean stopAtFirstLevel) {
-        modifiedVersionClassDependencies.packages
-                .stream()
-                .flatMap(packageField -> packageField.classes.stream())
-                .filter(classField -> classField.name.equals(className))
-                .forEach(classField -> {
-                    if (classField.inbounds != null) {
-                        classField.inbounds.forEach(inboundField -> {
-                            if (modifiedAndNewClassInbounds.contains(inboundField.text)) {
-                                return; // should skip, class already analyzed
-                            }
-                            modifiedAndNewClassInbounds.add(inboundField.text);
-
-                            if (inboundField.text.contains("Test")) {
-                                return;  // should not get dependencies for Tests Classes
-                            }
-
-                            if (!stopAtFirstLevel) {
-                                getClassInboundsForClass(inboundField.text, false);
-                            }
-                        });
-                    }
-        });
-    }
-
-    private void checkDependencyFinderHomePathRequirement() {
-        if (OSGetter.isUnix() || OSGetter.isMac()){
-            if (dependencyFinderHomePath == null) {
-                throw new NullPointerException("You need to instantiate TestSelector() " +
-                        "with DependencyFinder's home absolute path");
-            }
-        }
-    }
-
-    private void setClassesDependenciesForTestsFromInitialVersion() throws NotImplementedException {
-        runDependencyExtractorForInitialVersion();
-        runClassToClassForInitialVersion();
-
-        getDependenciesForTestsFromInitialVersionFromXML();
-        removeNotConfirmedClassDependenciesForTestsFromInitialVersion();
+        this.selectedViolations = new HashSet<String>(selectedViolations);
+        this.smellsDetector = new CodeSmellsDetector(modifiedProjectVersionDirectoryPath,selectedViolations,codeSmellIntersection);         	      
     }
 
 
-    private void getDependenciesForTestsFromInitialVersionFromXML() {
-        var xStream = new XStream();
-        xStream.ignoreUnknownElements();
-        xStream.allowTypesByWildcard(new String[] {
-                "com.RegressionTestSelectionTool.**",
-        });
-        xStream.processAnnotations(DependenciesField.class);
-        xStream.processAnnotations(PackageField.class);
-        xStream.processAnnotations(ClassField.class);
-        xStream.processAnnotations(InboundField.class);
-        xStream.processAnnotations(OutboundField.class);
-
-        var XMLFile = new File(tempXMLOutputPaths.get(4));
-
-        var initialVersionClassDependencies = (DependenciesField) xStream.fromXML(XMLFile);
-
-        if (initialVersionClassDependencies.packages != null) {
-            initialVersionClassDependencies.packages.forEach(packageField ->
-                    // get only Test Classes
-                    packageField.classes.removeIf(classField ->
-                            !classField.name.contains("Test"))
-            );
-        }
-
-        initialVersionTestsClassDependencies = initialVersionClassDependencies;
+    public Set<String> getSelectedTestcases() throws NotImplementedException {
+        return selectedTestClasses;
     }
 
-    private void runClassToClassForInitialVersion() throws NotImplementedException {
-        var classToClassCommand = getClassToClassCommandForInitialVersion();
-        execCmd(classToClassCommand);
-    }
+    
+	@SuppressWarnings("unused")
+	private void printDependenciesField(DependenciesField dependenciesField) {
+		int countIn = 0;
+		int countOut =0;
+		
+		if(dependenciesField.packages != null)
+		for(PackageField packageField : dependenciesField.packages) {
+			
+			System.out.println(""+packageField.name);
+			
+			if(packageField.classes != null)
+			for(ClassField classField : packageField.classes) {
+				
+				System.out.println("	"+classField.name);
+				
+				if(classField.inbounds != null)
+				for(InboundField inboundField : classField.inbounds) {
+					
+					System.out.println("		->"+inboundField.text);
+					//System.out.println("		"+inboundField.type);
+					countIn++;
+					
+				}
+				
+				if(classField.outbounds != null)
+				for(OutboundField outboundField : classField.outbounds) {
+					
+					System.out.println("		<-"+outboundField.text);
+					//System.out.println("		"+outboundField.type);
+					countOut++;
+					
+				}
+				
+			}
+			
+		}
+    	
+		
+	}
 
-    private void runDependencyExtractorForInitialVersion() throws NotImplementedException {
-        var dependencyExtractorCommand = getDependencyExtractorCommandForInitialVersion();
-        execCmd(dependencyExtractorCommand);
-    }
 
-    private void setClassesDependenciesForModifiedVersion() throws NotImplementedException {
-        runDependencyExtractorForModifiedVersion();
-        runClassToClassForModifiedVersion();
-
-        getDependenciesForModifiedVersionFromXML();
-        removeNotConfirmedClassDependenciesForModifiedVersion();
-    }
-
-    private void getDependenciesForModifiedVersionFromXML() {
-        var xStream = new XStream();
-        xStream.ignoreUnknownElements();
-        xStream.allowTypesByWildcard(new String[] {
-                "com.RegressionTestSelectionTool.**",
-        });
-        xStream.processAnnotations(DependenciesField.class);
-        xStream.processAnnotations(PackageField.class);
-        xStream.processAnnotations(ClassField.class);
-        xStream.processAnnotations(InboundField.class);
-        xStream.processAnnotations(OutboundField.class);
-
-        var XMLFile = new File(tempXMLOutputPaths.get(1));
-
-        modifiedVersionClassDependencies = (DependenciesField) xStream.fromXML(XMLFile);
-    }
-
-    private void runClassToClassForModifiedVersion() throws NotImplementedException {
-        var classToClassCommand = getClassToClassCommandForModifiedVersion();
-        execCmd(classToClassCommand);
-    }
-
-    private void runDependencyExtractorForModifiedVersion() throws NotImplementedException {
-        var dependencyExtractorCommand = getDependencyExtractorCommandForModifiedVersion();
-        execCmd(dependencyExtractorCommand);
-    }
-
-    private void setTempXMLOutputPaths() {
+    private void createTemporaryFilesPath() {
         String mainClassFolderPath = getMainClassFolderPath();
 
         tempXMLOutputPaths = new ArrayList<>(); 
@@ -469,6 +243,7 @@ public class TestSelector {
             tempXMLOutputPaths.add(Paths.get(mainClassFolderPath, tempXMLOutputFilename).toAbsolutePath().toString());
         }
     }
+
 
     private String getMainClassFolderPath() {
         File mainClassFile = null;
@@ -480,68 +255,33 @@ public class TestSelector {
         return mainClassFile.getParentFile().getPath();
     }
 
-    private String getDependencyExtractorCommandForInitialVersion() throws NotImplementedException {
-        String CLICommand;
-        if (OSGetter.isWindows()) {
-            CLICommand = "cmd.exe /c DependencyExtractor -xml -out " + tempXMLOutputPaths.get(3) + " " + initialProjectVersionDirectoryPath;
-        } else if (OSGetter.isUnix() || OSGetter.isMac()) {
-            CLICommand = dependencyFinderHomePath + "/bin/DependencyExtractor -xml -out " + tempXMLOutputPaths.get(3) + " " + initialProjectVersionDirectoryPath;
-        }
-        else {
-            throw new NotImplementedException("Your Operational System is not supported yet");
-        }
-        return CLICommand;
-    }
+  
+    private void deleteTempFiles() {		
+    	for (String filePath : tempXMLOutputPaths) {
+        	deleteFile(filePath);
+        }	
+    }  
 
-    private String getDependencyExtractorCommandForModifiedVersion() throws NotImplementedException {
-        String CLICommand;
-        if (OSGetter.isWindows()) {
-            CLICommand = "cmd.exe /c DependencyExtractor -xml -out " + tempXMLOutputPaths.get(0) + " " + modifiedProjectVersionDirectoryPath;
-        } else if (OSGetter.isUnix() || OSGetter.isMac()) {
-            CLICommand = dependencyFinderHomePath + "/bin/DependencyExtractor -xml -out " + tempXMLOutputPaths.get(0) + " " + modifiedProjectVersionDirectoryPath;
-        }
-        else {
-            throw new NotImplementedException("Your Operational System is not supported yet");
-        }
-        return CLICommand;
-    }
+    
+    private static void deleteFile(String filePathToDelete) {
 
-    private String getClassToClassCommandForInitialVersion() throws NotImplementedException {
-        String CLICommand;
-        if (OSGetter.isWindows()) {
-            CLICommand = "cmd.exe /c c2c " + tempXMLOutputPaths.get(3) + " -xml -out " + tempXMLOutputPaths.get(4);
-        } else if (OSGetter.isUnix() || OSGetter.isMac()) {
-            CLICommand = dependencyFinderHomePath + "/bin/c2c " + tempXMLOutputPaths.get(3) + " -xml -out " + tempXMLOutputPaths.get(4);
-        }
-        else {
-            throw new NotImplementedException("Your Operational System is not supported yet");
-        }
-        return CLICommand;
-    }
-
-    private String getClassToClassCommandForModifiedVersion() throws NotImplementedException {
-        String CLICommand;
-        if (OSGetter.isWindows()) {
-            CLICommand = "cmd.exe /c c2c " + tempXMLOutputPaths.get(0) + " -xml -out " + tempXMLOutputPaths.get(1);
-        } else if (OSGetter.isUnix() || OSGetter.isMac()) {
-            CLICommand = dependencyFinderHomePath + "/bin/c2c " + tempXMLOutputPaths.get(0) + " -xml -out " + tempXMLOutputPaths.get(1);
-        }
-        else {
-            throw new NotImplementedException("Your Operational System is not supported yet");
-        }
-        return CLICommand;
-    }
-
-    private void deleteTempFiles() {
-        for (String filePath : tempXMLOutputFilenames) {
-            File tempFile = new File(filePath);
-            tempFile.delete();
-        }
-    }
+		try{
+			File f= new File(filePathToDelete); 
+		
+			if(!f.delete()){
+				System.out.println("Temporary File Not Deleted  "+f.getName());
+			}else{  
+				//System.out.println("  Deleted  "+f.getName());  
+			}  
+		}catch(Exception e){
+			System.out.println("Error: "+filePathToDelete);
+			e.printStackTrace();
+		} 
+	}
 
 
     public void execCmd(String cmd) {
-        System.out.println();
+        System.out.println("");
         System.out.println("Running CLI Command: " + cmd);
         String errorResult = null;
         try (
@@ -559,4 +299,187 @@ public class TestSelector {
                             + "Error: " + errorResult);
         }
     }
+    
+
+    public Set<String> getAllClassesNamesFromNewestProject(){
+    	
+    	Set<String> allClasses = new HashSet<String>();
+    	
+    	for(PackageField packages : newestVersionClassDependencies.packages) {
+    		for(ClassField classes : packages.classes) {
+    			
+    			if(classes.confirmed.equals("yes")) {
+    				String className = filterSubClasses(classes.name);   				
+    				allClasses.add(className);
+    			}
+		   				    			
+    		}
+    	}
+    	
+    	
+    	return allClasses;
+    }
+    
+
+    public Set<String> getAllClassesNamesFromOldestProject(){
+    	
+    	Set<String> allClasses = new HashSet<String>();
+    	
+    	for(PackageField packages : oldestVersionClassDependencies.packages) {
+    		for(ClassField classes : packages.classes) {			
+    				String className = filterSubClasses(classes.name);   				
+    				allClasses.add(className);		   				    			
+    		}
+    	}
+    	
+    	return allClasses;
+    }
+
+    
+    public Set<String> getOriginalTestSet(){
+    	return originalTestSet;
+    }
+
+
+    private String filterSubClasses(String originalString) {
+    	String filteredString = originalString.split("\\$")[0];
+    	return filteredString;
+    }
+
+    
+	public DependenciesField getNewestVersionClassDependencies() {
+		return this.newestVersionClassDependencies;
+	}
+
+	public DependenciesField getOldestVersionClassDependencies() {
+		return this.oldestVersionClassDependencies;
+	}
+	
+	public DependenciesField getOldestVersionTestsClassDependencies() {
+		return this.oldestVersionTestsClassDependencies;
+	}
+
+	//Return Modified Classes Name
+	public Set<String> getModifiedClassesNames() {
+		HashSet<String> modifiedClassesNames = new HashSet<>();
+		
+		if(classDifferences != null) {
+			DifferencesField classDiff = classDifferences;
+			
+			if(classDiff.modifiedClassesField != null) {
+				
+				ModifiedClassesField modifiedClassesField = classDiff.modifiedClassesField;	
+				
+				if(modifiedClassesField.classes != null) {
+					
+					HashSet<ModifiedClassField> modifiedClassField  = modifiedClassesField.classes;
+					
+					for(ModifiedClassField modifiedClassFieldName : modifiedClassField) {
+						modifiedClassesNames.add(modifiedClassFieldName.name);			
+					}
+				}
+				
+			}
+				if(classDiff.newClassesField != null) {
+					NewClassesField newClassesField = classDiff.newClassesField;
+					for(var aux : newClassesField.names) {
+						modifiedClassesNames.add(aux);
+					}
+				}
+			
+			
+		}
+						
+		return modifiedClassesNames;
+	}
+	
+    //Show Confirmed Dependencies
+    @SuppressWarnings("unused")
+	private void printConsole(DependenciesField dependencies) {
+
+    	int countP = 0;
+    	int countC = 0;
+    	int countT = 0;
+    	
+    	for(PackageField packages : dependencies.packages) {
+			if(packages.confirmed.equals("yes")) {
+				
+				for(ClassField classes : packages.classes) {
+					
+					if(classes.confirmed.equals("yes")) {
+						
+						if((classes.name.toLowerCase().contains("test"))) {
+							System.out.println(packages.name+" | "+classes.name );
+							if(classes.inbounds != null)
+								classes.inbounds.forEach(inbound -> {System.out.println(inbound.text);});
+							//System.out.println(packages.name+";"+classes.name);
+							countT++;
+						}						
+						countC++;
+					}					
+				}				
+				countP++;
+			}				
+		}
+
+    	System.out.println("packages "+countP);
+    	System.out.println("classes "+countC);
+    	System.out.println("testcases "+countT);
+	}
+    
+    //Show Differences between Versions
+    @SuppressWarnings("unused")
+	private void printConsole(DifferencesField differences) {
+
+    	int countModified = 0;
+    	int countNewClasses = 0;
+    	int countNewPackages = 0;
+    	
+    	//String differencesName = differences.name; //Not necessary
+    	    	
+    	ModifiedClassesField modifiedClasses = differences.modifiedClassesField;  
+    	if(modifiedClasses != null) {
+    		for(ModifiedClassField classes : modifiedClasses.classes) {
+        		System.out.println(" "+classes.name);
+        		countModified++;
+        	}
+    	}
+    	
+    	
+    	NewClassesField newClasses = differences.newClassesField; 
+    	if(newClasses != null) {
+	    	for(String name : newClasses.names) {
+	    		System.out.println(" "+name);
+	    		countNewClasses++;
+	    	}
+    	}
+    	
+    	NewPackagesField newPackages = differences.newPackagesField;
+    	if(newPackages != null) {
+    		for(String name : newPackages.names) {
+        		//System.out.println(" "+name);
+        		countNewPackages++;
+        	}
+    	}
+    	
+   	    	
+    	System.out.println("Modified Classes "+countModified);
+    	System.out.println("New classes "+countNewClasses);
+    	System.out.println("New packages "+countNewPackages);    	
+	}
+
+	public Set<String> getSelectedClasses() {		
+		return selectedClasses;
+	}
+
+	public Set<String> getClassesWithViolations() {
+		return classesWithViolations;
+	}
+   
+	public Set<String> getSelectedClassesDependenciesList(){		
+		Set<String> list = new HashSet<>();		
+		selectedClassesDependencies.forEach(classField -> list.add(classField.name));		
+		return list;
+	}
+	
 }

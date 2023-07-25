@@ -1,49 +1,58 @@
 package com.RegressionTestSelectionTool.CodeSmellsDetector;
 
+import java.io.File;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import com.RegressionTestSelectionTool.TestSelector;
 import com.RegressionTestSelectionTool.utils.CLICommandExecuter;
 import com.RegressionTestSelectionTool.utils.OSGetter;
 import com.RegressionTestSelectionTool.xmlfields.smells.PmdFile;
 import com.RegressionTestSelectionTool.xmlfields.smells.PmdReport;
 import com.RegressionTestSelectionTool.xmlfields.smells.Violation;
+import com.google.common.collect.HashMultimap;
 import com.thoughtworks.xstream.XStream;
 
-import jdk.jshell.spi.ExecutionControl;
 import jdk.jshell.spi.ExecutionControl.NotImplementedException;
 
-import java.io.File;
-import java.net.URISyntaxException;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+public class CodeSmellsDetector implements Runnable{
 
-public class CodeSmellsDetector {
-
-    private String projectDirectoryPath;
+	//Paths
+	private String pmdRulesetPath;
+	private String projectDirectoryPath;
+    private List<String> tempXMLReportFilePaths;
     private final List<String> tempXMLOutputFilenames = Arrays.asList(
             "code_smells_list_tempfile.xml"
     );
-    private List<String> tempXMLReportFilePaths;
+    
     private ArrayList<String> selectedViolationsTypes = new ArrayList<String>();
-    private String pmdRulesetPath;
+    private HashMultimap<String, String> codeSmellMap = HashMultimap.create();
+    private Boolean codeSmellIntersection=Boolean.TRUE;
+    
+    private Set<String> classWithViolationsList = new HashSet<>();
+    
 
-    public CodeSmellsDetector(
-            String projectDirectoryPath, 
-            ArrayList<String> selectedViolationsTypes
-    ) throws NotImplementedException
-    {
+    public Set<String> getClassWithViolationsList() {
+		return classWithViolationsList;
+	}
+
+	public CodeSmellsDetector(String projectDirectoryPath, ArrayList<String> selectedViolationsTypes, Boolean codeSmellIntersection) throws NotImplementedException{
         this.projectDirectoryPath = projectDirectoryPath;
         this.selectedViolationsTypes = selectedViolationsTypes;
+        this.codeSmellIntersection = codeSmellIntersection;
 
         setTempXMLOutputPaths();
 
         this.pmdRulesetPath = getPmdRulesetPath();
     }
 
-    public Set<String> getClassWithCodeViolationsList() throws NotImplementedException
+    public void getClassWithCodeViolationsList() throws NotImplementedException
     {
         ArrayList<Violation> projectViolationsList = getProjectViolationsList();
 
@@ -51,7 +60,8 @@ public class CodeSmellsDetector {
 
         this.deleteTempFiles();
 
-        return getClassWithViolationsList(projectViolationsList);
+        //return getClassWithViolationsList(projectViolationsList);
+        classWithViolationsList = getClassWithViolationsList(projectViolationsList);
     }
 
     private ArrayList<Violation> getProjectViolationsList() throws NotImplementedException
@@ -59,10 +69,10 @@ public class CodeSmellsDetector {
         String violationsListTempfile = tempXMLOutputFilenames.get(0);
 
         String pmdCliCommand = getPmdCliCommand(projectDirectoryPath, violationsListTempfile);
+        
+        //CLICommandExecuter commandExecuter = new CLICommandExecuter();
 
-        CLICommandExecuter commandExecuter = new CLICommandExecuter();
-
-        commandExecuter.execute((pmdCliCommand));
+        CLICommandExecuter.Execute(pmdCliCommand);
 
         ArrayList<Violation> violations = getViolationsFromXMLReportFile(violationsListTempfile);
 
@@ -85,16 +95,21 @@ public class CodeSmellsDetector {
         tempXMLReportFilePaths = new ArrayList<>();
         for (String tempXMLOutputFilename: tempXMLOutputFilenames) {
             tempXMLReportFilePaths.add(Paths.get(projectPath, tempXMLOutputFilename).toAbsolutePath().toString());
+            
+            
+            
         }
+        
     }
 
     private String getProjectPath() {
-        File mainClassFile = null;
+    	File mainClassFile = null;
         try {
             mainClassFile = new File(TestSelector.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
         } catch (URISyntaxException e) {
             e.printStackTrace();
         }
+  
         return mainClassFile.getParentFile().getPath();
     }
 
@@ -118,54 +133,105 @@ public class CodeSmellsDetector {
     }
 
     private Set<String> getClassWithViolationsList(ArrayList<Violation> projectViolationsList) {
-        var classWithViolationsList = new HashSet<String>();
+    	Set<String> classWithViolationsList = new HashSet<String>();
 
-        for (Violation violation : projectViolationsList) {
-            classWithViolationsList.add(violation.getClassName());
-        }
-
-        return classWithViolationsList;
+    	for (Violation violation : projectViolationsList) {
+			classWithViolationsList.add(violation.getClassName());
+			codeSmellMap.put(violation.getClassName(), violation.rule);
+		}
+    	
+    	if(codeSmellIntersection) {
+    		
+    		 int NumberOfIntersections = selectedViolationsTypes.size();
+    	        Set<String> classesWithCodeSmells = getClassesWithNCodeSmells(codeSmellMap,NumberOfIntersections);
+    	        
+    	        return classesWithCodeSmells;
+    		 		
+    	}else {
+    		classWithViolationsList.removeIf(className -> className.contains(".null"));
+            return classWithViolationsList;
+    	}
+    
+        //System.out.println(codeSmellMap.toString());
+ 
     }
+    
 
-    private ArrayList<Violation> removeTestFiles(ArrayList<Violation> projectViolationsList) {
-        var testFiles = new ArrayList<String>();
+    private Set<String> getClassesWithNCodeSmells(HashMultimap<String, String> codeSmellMap2, int n) {
+		HashSet<String> classesList  = new HashSet<String>();
+		
+		for (String className : codeSmellMap2.keys()) {
+		    Collection<String> codeSmellType = codeSmellMap2.get(className);
+		    if(codeSmellType.size() == n) {
+		    	classesList.add(className);
+		    }
+		    
+		    //for (String value : codeSmellType) {
+		        //System.out.println(className + " -> " + value);
+		    //}
+		}
+		
+		return classesList;
+	}
+
+	private ArrayList<Violation> removeTestFiles(ArrayList<Violation> projectViolationsList) {
+    	ArrayList<Violation> testFiles = new ArrayList<Violation>();
 
         for (Violation violation : projectViolationsList) {
-            if (violation.getClassName().contains("Test")) {
-                testFiles.add(violation.getClassName());
+            if (violation.getClassName().toLowerCase().contains("test")) {
+                testFiles.add(violation);
             }
         }
 
-        for (String testFile : testFiles) {
-            projectViolationsList.removeIf(violation -> violation.getClassName().equals(testFile));
-        }
-
+        projectViolationsList.removeAll(testFiles);
+        
         return projectViolationsList;
     }
 
     private void deleteTempFiles() {
-        for (String tempXMLOutputFilename: tempXMLOutputFilenames) {
-            File tempXMLOutputFile = new File(tempXMLOutputFilename);
-            tempXMLOutputFile.delete();
-        }
+        //for (String tempXMLOutputFilename: tempXMLReportFilePaths) {       	
+        	//System.out.println("tempXMLOutputFilename "+tempXMLOutputFilename);
+            //deleteFile(tempXMLOutputFilename);
+        //}
 
         if (!selectedViolationsTypes.isEmpty()) {
-            File pmdRulesetFile = new File(this.pmdRulesetPath); 
-            
-            pmdRulesetFile.delete();
+            deleteFile(this.pmdRulesetPath);
         }
     }
+    
+    private static void deleteFile(String filePathToDelete) {
+
+		try{
+			File f= new File(filePathToDelete); 
+		
+			if(!f.delete()){
+				System.out.println("Temporary File Not Deleted  "+f.getName());
+				System.out.println("file Path To Delete: "+filePathToDelete);
+			}else{  
+				//System.out.println("  Deleted  "+f.getName());  
+			}  
+		}catch(Exception e){
+			System.out.println("Error: "+filePathToDelete);
+			e.printStackTrace();
+		} 
+	}
 
     private String getPmdRulesetPath() {
         if (selectedViolationsTypes.isEmpty()) 
             return "rulesets/java/quickstart.xml";
-        
-        // if(selectedViolationsTypes.contains("Comments")){
-        //     selectedViolationsTypes.clear();
-        //     return "/home/luccasparoni/Documents/TCC/rulesets/nocomments.xml";
-        // }
 
         var rulesetsFactory = new PmdXmlRulesetFactory(this.selectedViolationsTypes);
         return rulesetsFactory.buildXmlRuleset(getProjectPath());
     }
+
+	@Override
+	public void run() {
+		try {
+			getClassWithCodeViolationsList();
+		} catch (NotImplementedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
 }

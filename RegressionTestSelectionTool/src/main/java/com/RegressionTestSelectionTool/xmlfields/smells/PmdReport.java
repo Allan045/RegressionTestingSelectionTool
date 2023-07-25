@@ -14,9 +14,12 @@ public class PmdReport {
   public ArrayList<Violation> getViolations() {
     var violations = new ArrayList<Violation>();
 
-    for (var file : this.file) {
-      violations.addAll(file.getViolations());
+    if(this.file != null) {
+    	for (var file : this.file) {
+    	      violations.addAll(file.getViolations());
+    	}
     }
+    
 
     return violations;
   } 

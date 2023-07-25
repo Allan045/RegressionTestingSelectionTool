@@ -1,8 +1,6 @@
 package com.RegressionTestSelectionTool.CodeSmellsDetector;
 
-import java.io.File;
 import java.io.FileOutputStream;
-import java.io.WriteAbortedException;
 import java.nio.channels.WritePendingException;
 import java.util.ArrayList;
 
