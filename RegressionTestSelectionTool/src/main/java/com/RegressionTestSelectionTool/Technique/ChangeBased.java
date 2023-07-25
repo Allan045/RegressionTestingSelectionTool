@@ -31,15 +31,17 @@ public class ChangeBased extends SelectionTechnique{
 		long start = System.currentTimeMillis();
 		this.selectedClasses = getSelectedClassesSet();
 		
-        getSelectedClassesDependenciesRecursive(selectedClasses,Boolean.TRUE);
+        getSelectedClassesDependenciesRecursive(this.selectedClasses,Boolean.TRUE);
         getSelectedTestCasesUsingClassesInbounds();
         
         this.notSelectedTestClasses = getNotSelectedTestCases(this.selectedTestClasses,this.originalTestSet);
+        
+        
         this.executionTime = System.currentTimeMillis() - start;
         
         createReport();
 		
-        System.out.println("Change Based TestSet: "+selectedTestClasses.toString());
+        System.out.println("Change Based TestSet: "+this.selectedTestClasses.toString());
         System.out.println("");
         
 	}

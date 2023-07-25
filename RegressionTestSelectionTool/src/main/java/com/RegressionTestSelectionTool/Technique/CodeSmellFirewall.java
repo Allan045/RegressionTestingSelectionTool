@@ -37,7 +37,7 @@ public class CodeSmellFirewall extends SelectionTechnique {
         
         createReport();
 		
-		System.out.println("Code Smell Firewall TestSet: "+selectedTestClasses.toString());
+		System.out.println("Code Smell Firewall TestSet: "+this.selectedTestClasses.toString());
 		System.out.println("");
 		
 	}

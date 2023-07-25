@@ -45,7 +45,7 @@ public class ChangeAndCodeSmellBased extends SelectionTechnique {
         
         createReport();
 		
-		System.out.println("Change and Code Smell Based TestSet: "+selectedTestClasses.toString());
+		System.out.println("Change and Code Smell Based TestSet: "+this.selectedTestClasses.toString());
 		System.out.println("");
 		
 	}
