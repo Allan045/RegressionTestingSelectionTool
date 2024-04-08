@@ -4,46 +4,52 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.RegressionTestSelectionTool.Report;
-import com.RegressionTestSelectionTool.DependencyFinderTool.DependencyFinder;
 import com.RegressionTestSelectionTool.xmlfields.dependencies.DependenciesField;
 import com.RegressionTestSelectionTool.xmlfields.differences.DifferencesField;
 import com.RegressionTestSelectionTool.xmlfields.differences.ModifiedClassField;
 import com.RegressionTestSelectionTool.xmlfields.differences.ModifiedClassesField;
 import com.RegressionTestSelectionTool.xmlfields.differences.NewClassesField;
 
-public class ChangeBased extends SelectionTechnique{
-	
+public class ChangeAndSmellFirewall extends SelectionTechnique {
+
 	protected DifferencesField classDifferences;
+	protected Set<String> selectedViolations;
+	protected Set<String> classesWithViolations;
 	
-	public ChangeBased(DependenciesField oldestVersionClassDependencies,
+	public ChangeAndSmellFirewall(DependenciesField oldestVersionClassDependencies,
 			DependenciesField oldestVersionTestsClassDependencies, 
 			DependenciesField newestVersionClassDependencies,
-			DifferencesField classDifferences) {
+			DifferencesField classDifferences,
+			Set<String> selectedViolations,
+			Set<String> classesWithViolations) {
 		
-		super(SelectionTechniqueEnum.CHANGE_BASED,
-				oldestVersionClassDependencies,
+		super(SelectionTechniqueEnum.CHANGE_AND_SMELL_FIREWALL, 
+				oldestVersionClassDependencies, 
 				oldestVersionTestsClassDependencies,
 				newestVersionClassDependencies);
-		
-		this.classDifferences = classDifferences;	
 
+		this.classDifferences = classDifferences;	
+		this.selectedViolations = selectedViolations;
+		this.classesWithViolations = classesWithViolations;
 		
 		long start = System.currentTimeMillis();
 		this.selectedClasses = getSelectedClassesSet();
+		this.selectedClasses.addAll(getSelectedClassesWithViolations());
 		
-        getSelectedClassesDependenciesRecursive(selectedClasses,Boolean.TRUE);
+		getSelectedClassesDependenciesRecursive(this.selectedClasses,Boolean.FALSE);
         getSelectedTestCasesUsingClassesInbounds();
         
         this.notSelectedTestClasses = getNotSelectedTestCases(this.selectedTestClasses,this.originalTestSet);
         this.executionTime = System.currentTimeMillis() - start;
         
         createReport();
-		
-        System.out.println("Change Based TestSet: "+selectedTestClasses.toString());
-        System.out.println("");
-        
-	}
 
+		System.out.println("Change and Smell Firewall TestSet: "+selectedTestClasses.toString());
+		System.out.println("");
+		
+	}
+	
+	
 	private Set<String> getSelectedClassesSet() {
 		Set<String> selectedClasses = new HashSet<>();
 		
@@ -61,6 +67,19 @@ public class ChangeBased extends SelectionTechnique{
         }
         return selectedClasses;
     }
+	
+	private Set<String> getSelectedClassesWithViolations() {
+	   	 Set<String> selectedClasses = new HashSet<>();
+	   	
+	   	if (classesWithViolations != null && !classesWithViolations.isEmpty()) {
+	           classesWithViolations.forEach(classWithViolation -> {              
+	               selectedClasses.add(classWithViolation);    
+	           });
+	       }
+	       
+	       return selectedClasses;   
+	}
+
 
 	//Return Modified Classes Name
 		public Set<String> getModifiedClassesNames() {
@@ -100,10 +119,10 @@ public class ChangeBased extends SelectionTechnique{
 		@Override
 		protected void createReport() {
 
-			report = new Report(techniqueName,new HashSet<>(),oldestVersionClassDependencies,
-					newestVersionClassDependencies,getModifiedClassesNames(),new HashSet<>(),selectedClasses,getSelectedClassesDependenciesList(),
-					getOriginalTestSet(),selectedTestClasses,notSelectedTestClasses,executionTime);
-	
+			report = new Report(techniqueName,selectedViolations,oldestVersionClassDependencies,
+					newestVersionClassDependencies,getModifiedClassesNames(),classesWithViolations,selectedClasses,getSelectedClassesDependenciesList(),
+					getOriginalTestSet(),selectedTestClasses,notSelectedTestClasses,executionTime);		
 		}
+
 	
 }

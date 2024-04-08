@@ -141,13 +141,7 @@ public abstract class SelectionTechnique {
 	protected Set<String> getNotSelectedTestCases(Set<String> selectedTestClasses, Set<String> originalTestSet) {
     	Set<String> notSelectedTestSet = new HashSet<String>(originalTestSet);
     	  	
-    	notSelectedTestSet.removeAll(selectedTestClasses);
-    	
-    	//System.out.println(selectedTestClasses.size()+" "+selectedTestClasses.toString());
-    	//System.out.println(originalTestSet.size()+" "+originalTestSet.toString());
-    	//System.out.println(notSelectedTestSet.size()+" "+notSelectedTestSet.toString());
-    	
-    	
+    	notSelectedTestSet.removeAll(selectedTestClasses);    	
     	return notSelectedTestSet;
 	}
 	

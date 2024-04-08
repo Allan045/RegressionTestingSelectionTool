@@ -25,7 +25,7 @@ public class ClassFirewall extends SelectionTechnique{
 		this.selectedClasses = getSelectedClassesSet();
 		
 		long start = System.currentTimeMillis();
-		getSelectedClassesDependenciesRecursive(this.selectedClasses,Boolean.FALSE);
+		getSelectedClassesDependenciesRecursive(selectedClasses,Boolean.FALSE);
         getSelectedTestCasesUsingClassesInbounds();
         
         this.notSelectedTestClasses = getNotSelectedTestCases(this.selectedTestClasses,this.originalTestSet);
@@ -33,7 +33,7 @@ public class ClassFirewall extends SelectionTechnique{
         
         createReport();
 		
-        System.out.println("Class Firewall TestSet: "+this.selectedTestClasses.toString());
+        System.out.println("Class Firewall TestSet: "+selectedTestClasses.toString());
         System.out.println("");
 
 	}

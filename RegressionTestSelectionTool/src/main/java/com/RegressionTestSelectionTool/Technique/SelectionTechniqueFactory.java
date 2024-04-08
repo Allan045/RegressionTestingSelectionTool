@@ -28,30 +28,46 @@ public class SelectionTechniqueFactory {
 					newestVersionClassDependencies,
 					classDifferences);	
 			
-		case CODE_SMELL_BASED:
-			return new CodeSmellBased(oldestVersionClassDependencies,
+		case SMELL_BASED:
+			return new SmellBased(oldestVersionClassDependencies,
 					oldestVersionTestsClassDependencies,
 					newestVersionClassDependencies,
 					selectedViolations,
 					classesWithViolations);	
 			
-		case CODE_SMELL_FIREWALL:
-			return new CodeSmellFirewall(oldestVersionClassDependencies,
+		case SMELL_FIREWALL:
+			return new SmellFirewall(oldestVersionClassDependencies,
 					oldestVersionTestsClassDependencies,
 					newestVersionClassDependencies,
 					selectedViolations,
 					classesWithViolations);
 			
-		case CHANGE_AND_CODE_SMELL_BASED:
-			return new ChangeAndCodeSmellBased(oldestVersionClassDependencies,
+		case CHANGE_AND_SMELL_BASED:
+			return new ChangeAndSmellBased(oldestVersionClassDependencies,
 					oldestVersionTestsClassDependencies,
 					newestVersionClassDependencies,
 					classDifferences,
 					selectedViolations,
 					classesWithViolations);
 			
-		case CLASS_FIREWALL_WITH_SMELLS:
-			return new ClassAndSmellsFirewall(oldestVersionClassDependencies,
+		case CHANGE_AND_SMELL_FIREWALL:
+			return new ChangeAndSmellFirewall(oldestVersionClassDependencies,
+					oldestVersionTestsClassDependencies,
+					newestVersionClassDependencies,
+					classDifferences,
+					selectedViolations,
+					classesWithViolations);
+			
+		case CHANGE_AND_SMELL_INTERSECTION_BASED:
+			return new ChangeAndSmellIntersectionBased(oldestVersionClassDependencies,
+					oldestVersionTestsClassDependencies,
+					newestVersionClassDependencies,
+					classDifferences,
+					selectedViolations,
+					classesWithViolations);
+			
+		case CHANGE_AND_SMELL_INTERSECTION_FIREWALL:
+			return new ChangeAndSmellIntersectionFirewall(oldestVersionClassDependencies,
 					oldestVersionTestsClassDependencies,
 					newestVersionClassDependencies,
 					classDifferences,

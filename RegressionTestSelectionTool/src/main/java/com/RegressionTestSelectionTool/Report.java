@@ -89,21 +89,21 @@ public class Report{
 	    	BufferedWriter bw = new BufferedWriter(fw);
 			
 			if(header) {
-				String head = new String("project name;"
-						+ "oldest version id;oldest version type;"
-						+ "newest version id;newest version type;"
-						+ "selection tecnique;code smells;"
-		        		+ "# classes oldest project;classes oldest project;"
-		        		+ "# classes newest project;classes newest project;"
-		        		+ "# modified classes;modified classes;"
-		        		+ "# smelly classes;smelly classes;"
-		        		+ "# selected classes;selected classes;"
-		        		+ "# testcases;testcases;"
-		        		+ "# selected testcases;selected testcases;"
-		        		+ "# not selected testcases;not selected testcases;"
-		        		+ "selection time (ms);"
-		        		+ "# defects4j trigger tests;defects4j trigger tests;"
-		        		+ "# Selected Tests that reveal Bugs;Selected Tests that reveal Bugs;");
+				String head = new String("Project;"
+						+ "Oldest Version ID;Oldest Version Type;"
+						+ "Newest Version ID;Newest Version Type;"
+						+ "Selection Tecnique;Code Smell;"
+		        		+ "# Classes Oldest Project;Classes Oldest Project;"
+		        		+ "# Classes Newest Project;Classes Newest Project;"
+		        		+ "# Changed Classes;Changed Classes;"
+		        		+ "# Smelly Classes;Smelly Classes;"
+		        		+ "# Selected Classes;Selected Classes;"
+		        		+ "# Tests;Tests;"
+		        		+ "# Selected Tests;Selected Tests;"
+		        		+ "# Not Selected Tests;Not Selected Tests;"
+		        		+ "Selection Time (ms);"
+		        		+ "# Fault Revealing Tests (Defects4J);Fault Revealing Tests (Defects4J);"
+		        		+ "# Selected Fault Revealing Tests;Selected Fault Revealing Tests;");
 				
 				
 				bw.write((String) head);
@@ -246,17 +246,21 @@ public class Report{
 
 	public String getSelectionTechnique() {
 		if(SelectionTechniqueEnum.CHANGE_BASED.equals(selectionTechnique)) {
-			return "Change_Based";
+			return "Change Based";
 		}else if(SelectionTechniqueEnum.CLASS_FIREWALL.equals(selectionTechnique)) {
-			return "Class_Firewall";
-		}else if(SelectionTechniqueEnum.CODE_SMELL_FIREWALL.equals(selectionTechnique)) {
-			return "Code_Smell_Firewall";
-		}else if(SelectionTechniqueEnum.CLASS_FIREWALL_WITH_SMELLS.equals(selectionTechnique)) {
-			return "Class_Firewall_With_Code_Smells";
-		}else if(SelectionTechniqueEnum.CODE_SMELL_BASED.equals(selectionTechnique)) {
-			return "Code_Smell_Based";
-		}else if(SelectionTechniqueEnum.CHANGE_AND_CODE_SMELL_BASED.equals(selectionTechnique)) {
-			return "Change_And_Code_Smell_Based";
+			return "Class Firewall";
+		}else if(SelectionTechniqueEnum.SMELL_FIREWALL.equals(selectionTechnique)) {
+			return "Smell Firewall";
+		}else if(SelectionTechniqueEnum.CHANGE_AND_SMELL_FIREWALL.equals(selectionTechnique)) {
+			return "Change and Smell Firewall";
+		}else if(SelectionTechniqueEnum.SMELL_BASED.equals(selectionTechnique)) {
+			return "Smell Based";
+		}else if(SelectionTechniqueEnum.CHANGE_AND_SMELL_BASED.equals(selectionTechnique)) {
+			return "Change and Smell Based";
+		}else if(SelectionTechniqueEnum.CHANGE_AND_SMELL_INTERSECTION_BASED.equals(selectionTechnique)) {
+			return "Change and Smell Intersection Based";
+		}else if(SelectionTechniqueEnum.CHANGE_AND_SMELL_INTERSECTION_FIREWALL.equals(selectionTechnique)) {
+			return "Change and Smell Intersection Firewall";
 		}
 		return "";
 	}
@@ -329,16 +333,17 @@ public class Report{
 		try {
 			BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(directoryName+fileName+".csv")));
 			
-			String head = new String("selection tecnique;code smells;"
-	        		+ "# classes oldest project; classes oldest project;"
-	        		+ "# classes newest project; classes newest project;"
-	        		+ "# modified classes; modified classes;"
-	        		+ "# smelly classes; smelly classes;"
-	        		+ "# selected classes; selected classes;"
-	        		+ "# testcases; testcases;"
-	        		+ "# selected testcases; selected testcases;"
-	        		+ "# not selected testcases; not selected testcases;"
-	        		+ "time (ms)");
+			String head = new String("Selection Technique;Code Smell;"
+					+ "# Classes Oldest Project;Classes Oldest Project;"
+	        		+ "# Classes Newest Project;Classes Newest Project;"
+	        		+ "# Changed Classes;Changed Classes;"
+	        		+ "# Smelly Classes;Smelly Classes;"
+	        		+ "# Selected Classes;Selected Classes;"
+	        		+ "# Tests;Tests;"
+	        		+ "# Selected Tests;Selected Tests;"
+	        		+ "# Not Selected Tests;Not Selected Tests;"
+	        		+ "Selection Time (ms);");
+			
 			
 			bw.write((String) head);
 			bw.write(CSV_SEPARATOR);			
@@ -463,16 +468,16 @@ public class Report{
 	public void printSummaryConsole() {
 		System.out.println("");
 		System.out.println(getSelectionTechnique());
-		System.out.println("Total Classes Oldest Version: "+oldestVersionClassesSet.size());
-		System.out.println("Total Classes Newest Version: "+newestVersionClassesSet.size());
-		System.out.println("Modified Classes: "+modifiedClassesSet.size());
+		System.out.println("Classes Oldest Version: "+oldestVersionClassesSet.size());
+		System.out.println("Classes Newest Version: "+newestVersionClassesSet.size());
+		System.out.println("Changed Classes: "+modifiedClassesSet.size());
 		System.out.println("Smelly Classes: "+codesmellClasses.size()+" "+selectedViolations.toString());
 		System.out.println("Selected Classes Seeds: "+ selectedClasses.size()); 
 		System.out.println("Selected Classes Dependencies: "+selectedClassesDependencies.size());
-   		System.out.println("Original Test Set Size: "+ testSet.size());
-   		System.out.println("Selected Test Set Size: "+ selectedTestSet.size());
-   		System.out.println("Not Selected Test Set Size: "+ notSelectedTestSet.size());
-   		System.out.println("Execution Time: "+(executionTime)+"ms");
+   		System.out.println("Test: "+ testSet.size());
+   		System.out.println("Selected Test: "+ selectedTestSet.size());
+   		System.out.println("Not Selected Tests: "+ notSelectedTestSet.size());
+   		System.out.println("Selection Time: "+(executionTime)+"ms");
    		System.out.println("");
 	}
 	

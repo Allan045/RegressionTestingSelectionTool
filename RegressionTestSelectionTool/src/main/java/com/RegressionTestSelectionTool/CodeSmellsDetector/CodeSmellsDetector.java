@@ -83,7 +83,7 @@ public class CodeSmellsDetector implements Runnable{
         if (OSGetter.isWindows()) {
             return ".\\pmd.bat -d " + projectVersionDirectoryPath + " -f xml -R "+ this.pmdRulesetPath + " --report-file " + reportFileDirectoryPath;
         } else if (OSGetter.isUnix()) {
-            return "run.sh pmd -d " + projectVersionDirectoryPath + " -f xml -R "+ this.pmdRulesetPath + " --report-file " + reportFileDirectoryPath;
+            return "pmd check " + projectVersionDirectoryPath + " -f xml -R "+ this.pmdRulesetPath + " --report-file " + reportFileDirectoryPath;     
         } else {
             throw new NotImplementedException("Your Operational System is not supported yet");
         }
